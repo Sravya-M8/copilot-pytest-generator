@@ -6,12 +6,9 @@ pipeline {
         REPORTS_DIR     = 'reports'
         TEST_RESULTS    = 'reports\\test-results.xml'
         COVERAGE_DIR    = 'reports\\coverage'
-        VENV_DIR        = 'venv'
-        VENV_ACTIVATE   = 'venv\\Scripts\\activate'
     }
 
     options {
-        timestamps()
         timeout(time: 30, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
@@ -24,7 +21,7 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Checkout') {
             steps {
-                echo "📥 Checking out code from GitHub..."
+                echo "Checking out code from GitHub..."
                 checkout scm
                 bat 'if not exist reports mkdir reports'
             }
@@ -35,7 +32,7 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Setup Python Environment') {
             steps {
-                echo '🐍 Setting up Python virtual environment...'
+                echo 'Setting up Python virtual environment...'
                 bat '''
                     python --version
                     python -m venv venv
@@ -50,7 +47,7 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Install Dependencies') {
             steps {
-                echo '📦 Installing project dependencies...'
+                echo 'Installing project dependencies...'
                 bat '''
                     call venv\\Scripts\\activate
                     pip install pytest pytest-cov --quiet
@@ -65,37 +62,27 @@ pipeline {
         // STAGE 4 — CODE QUALITY
         // ══════════════════════════════════════════════════
         stage('Code Quality') {
-            parallel {
+            steps {
+                echo 'Running code quality checks...'
+                bat '''
+                    call venv\\Scripts\\activate
 
-                stage('Lint') {
-                    steps {
-                        echo '🔍 Running flake8 linter...'
-                        bat '''
-                            call venv\\Scripts\\activate
-                            pip install flake8 --quiet
-                            flake8 . ^
-                              --max-line-length=100 ^
-                              --exclude=venv,__pycache__,.git,.pytest_cache ^
-                              --output-file=reports\\flake8-report.txt ^
-                            || exit /b 0
-                        '''
-                    }
-                }
+                    echo Running flake8 linter...
+                    pip install flake8 --quiet
+                    flake8 . ^
+                      --max-line-length=100 ^
+                      --exclude=venv,__pycache__,.git,.pytest_cache ^
+                      --output-file=reports\\flake8-report.txt ^
+                    || exit /b 0
 
-                stage('Security Scan') {
-                    steps {
-                        echo '🔐 Running bandit security scan...'
-                        bat '''
-                            call venv\\Scripts\\activate
-                            pip install bandit --quiet
-                            bandit -r . ^
-                              -x venv,tests,__pycache__ ^
-                              -f json ^
-                              -o reports\\bandit-report.json ^
-                            || exit /b 0
-                        '''
-                    }
-                }
+                    echo Running bandit security scan...
+                    pip install bandit --quiet
+                    bandit -r . ^
+                      -x venv,tests,__pycache__ ^
+                      -f json ^
+                      -o reports\\bandit-report.json ^
+                    || exit /b 0
+                '''
             }
         }
 
@@ -104,7 +91,7 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Run Tests') {
             steps {
-                echo '🧪 Running pytest test suite...'
+                echo 'Running pytest test suite...'
                 bat '''
                     call venv\\Scripts\\activate
                     pytest tests/ ^
@@ -119,24 +106,15 @@ pipeline {
             }
             post {
                 always {
-                    echo '📊 Publishing test results...'
+                    echo 'Publishing test results...'
                     junit allowEmptyResults: true,
                           testResults: 'reports\\test-results.xml'
-
-                    publishHTML([
-                        allowMissing:          true,
-                        alwaysLinkToLastBuild: true,
-                        keepAll:               true,
-                        reportDir:             'reports\\coverage',
-                        reportFiles:           'index.html',
-                        reportName:            'Coverage Report'
-                    ])
                 }
                 success {
-                    echo '✅ All tests passed!'
+                    echo 'All tests passed!'
                 }
                 failure {
-                    echo '❌ Some tests failed — check report above.'
+                    echo 'Some tests failed - check report above.'
                 }
             }
         }
@@ -146,10 +124,8 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Build') {
             steps {
-                echo '🏗️ Build stage...'
+                echo 'Build stage...'
                 bat 'echo Build #%BUILD_NUMBER% completed successfully'
-                // Add your actual build command here if needed
-                // e.g. bat 'python -m build'
             }
         }
 
@@ -161,9 +137,8 @@ pipeline {
                 branch 'main'
             }
             steps {
-                echo '🚀 Deploying application...'
+                echo 'Deploying application...'
                 bat 'echo Deploying build #%BUILD_NUMBER%...'
-                // Add your actual deploy command here
             }
         }
     }
@@ -171,21 +146,13 @@ pipeline {
     // ── Post Pipeline ──────────────────────────────────────
     post {
         success {
-            echo '''
-            ╔══════════════════════════════════════╗
-            ║   ✅ PIPELINE PASSED SUCCESSFULLY    ║
-            ╚══════════════════════════════════════╝
-            '''
+            echo 'PIPELINE PASSED SUCCESSFULLY'
         }
         failure {
-            echo '''
-            ╔══════════════════════════════════════╗
-            ║   ❌ PIPELINE FAILED — CHECK LOGS    ║
-            ╚══════════════════════════════════════╝
-            '''
+            echo 'PIPELINE FAILED - CHECK LOGS'
         }
         always {
-            echo '🧹 Cleaning up workspace...'
+            echo 'Cleaning up workspace...'
             cleanWs()
         }
     }
