@@ -6,11 +6,12 @@ pipeline {
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
+    environment {
+        PYTHON = 'C:\\Users\\mathi.sravya\\AppData\\Local\\Programs\\Python\\Python313\\python.exe'
+    }
+
     stages {
 
-        // ══════════════════════════════════════════════════
-        // STAGE 1 — CHECKOUT
-        // ══════════════════════════════════════════════════
         stage('Checkout') {
             steps {
                 echo 'Checking out code from GitHub...'
@@ -19,21 +20,15 @@ pipeline {
             }
         }
 
-        // ══════════════════════════════════════════════════
-        // STAGE 2 — SETUP PYTHON
-        // ══════════════════════════════════════════════════
         stage('Setup Python Environment') {
             steps {
                 echo 'Setting up Python virtual environment...'
-                bat 'python --version'
-                bat 'python -m venv venv'
+                bat '"%PYTHON%" --version'
+                bat '"%PYTHON%" -m venv venv'
                 bat 'venv\\Scripts\\python.exe -m pip install --upgrade pip'
             }
         }
 
-        // ══════════════════════════════════════════════════
-        // STAGE 3 — INSTALL DEPENDENCIES
-        // ══════════════════════════════════════════════════
         stage('Install Dependencies') {
             steps {
                 echo 'Installing dependencies...'
@@ -48,9 +43,6 @@ pipeline {
             }
         }
 
-        // ══════════════════════════════════════════════════
-        // STAGE 4 — CODE QUALITY
-        // ══════════════════════════════════════════════════
         stage('Code Quality') {
             steps {
                 echo 'Running code quality checks...'
@@ -59,9 +51,6 @@ pipeline {
             }
         }
 
-        // ══════════════════════════════════════════════════
-        // STAGE 5 — RUN TESTS
-        // ══════════════════════════════════════════════════
         stage('Run Tests') {
             steps {
                 echo 'Running pytest...'
@@ -75,9 +64,6 @@ pipeline {
             }
         }
 
-        // ══════════════════════════════════════════════════
-        // STAGE 6 — BUILD
-        // ══════════════════════════════════════════════════
         stage('Build') {
             steps {
                 echo 'Build stage completed'
@@ -85,9 +71,6 @@ pipeline {
             }
         }
 
-        // ══════════════════════════════════════════════════
-        // STAGE 7 — DEPLOY
-        // ══════════════════════════════════════════════════
         stage('Deploy') {
             when {
                 branch 'main'
@@ -99,7 +82,6 @@ pipeline {
         }
     }
 
-    // ── Post Pipeline ──────────────────────────────────────
     post {
         success {
             echo 'PIPELINE PASSED SUCCESSFULLY'
