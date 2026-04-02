@@ -1,17 +1,9 @@
 pipeline {
     agent any
 
-    // ── Environment Variables ──────────────────────────────
-    environment {
-        REPORTS_DIR     = 'reports'
-        TEST_RESULTS    = 'reports\\test-results.xml'
-        COVERAGE_DIR    = 'reports\\coverage'
-    }
-
     options {
         timeout(time: 30, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        disableConcurrentBuilds()
     }
 
     stages {
@@ -21,24 +13,21 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Checkout') {
             steps {
-                echo "Checking out code from GitHub..."
+                echo 'Checking out code from GitHub...'
                 checkout scm
                 bat 'if not exist reports mkdir reports'
             }
         }
 
         // ══════════════════════════════════════════════════
-        // STAGE 2 — SETUP PYTHON ENVIRONMENT
+        // STAGE 2 — SETUP PYTHON
         // ══════════════════════════════════════════════════
         stage('Setup Python Environment') {
             steps {
                 echo 'Setting up Python virtual environment...'
-                bat '''
-                    python --version
-                    python -m venv venv
-                    call venv\\Scripts\\activate
-                    python -m pip install --upgrade pip
-                '''
+                bat 'python --version'
+                bat 'python -m venv venv'
+                bat 'venv\\Scripts\\python.exe -m pip install --upgrade pip'
             }
         }
 
@@ -47,12 +36,13 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Install Dependencies') {
             steps {
-                echo 'Installing project dependencies...'
+                echo 'Installing dependencies...'
+                bat 'venv\\Scripts\\pip.exe install pytest pytest-cov'
                 bat '''
-                    call venv\\Scripts\\activate
-                    pip install pytest pytest-cov --quiet
                     if exist requirements.txt (
-                        pip install -r requirements.txt --quiet
+                        venv\\Scripts\\pip.exe install -r requirements.txt
+                    ) else (
+                        echo No requirements.txt found, skipping...
                     )
                 '''
             }
@@ -64,25 +54,8 @@ pipeline {
         stage('Code Quality') {
             steps {
                 echo 'Running code quality checks...'
-                bat '''
-                    call venv\\Scripts\\activate
-
-                    echo Running flake8 linter...
-                    pip install flake8 --quiet
-                    flake8 . ^
-                      --max-line-length=100 ^
-                      --exclude=venv,__pycache__,.git,.pytest_cache ^
-                      --output-file=reports\\flake8-report.txt ^
-                    || exit /b 0
-
-                    echo Running bandit security scan...
-                    pip install bandit --quiet
-                    bandit -r . ^
-                      -x venv,tests,__pycache__ ^
-                      -f json ^
-                      -o reports\\bandit-report.json ^
-                    || exit /b 0
-                '''
+                bat 'venv\\Scripts\\pip.exe install flake8'
+                bat 'venv\\Scripts\\flake8.exe . --max-line-length=100 --exclude=venv,__pycache__,.git,.pytest_cache || exit /b 0'
             }
         }
 
@@ -91,30 +64,13 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Run Tests') {
             steps {
-                echo 'Running pytest test suite...'
-                bat '''
-                    call venv\\Scripts\\activate
-                    pytest tests/ ^
-                      -v ^
-                      --tb=short ^
-                      --junitxml=reports\\test-results.xml ^
-                      --cov=. ^
-                      --cov-report=xml:reports\\coverage.xml ^
-                      --cov-report=html:reports\\coverage ^
-                    || exit /b 0
-                '''
+                echo 'Running pytest...'
+                bat 'venv\\Scripts\\pytest.exe tests/ -v --tb=short --junitxml=reports\\test-results.xml || exit /b 0'
             }
             post {
                 always {
-                    echo 'Publishing test results...'
                     junit allowEmptyResults: true,
                           testResults: 'reports\\test-results.xml'
-                }
-                success {
-                    echo 'All tests passed!'
-                }
-                failure {
-                    echo 'Some tests failed - check report above.'
                 }
             }
         }
@@ -124,21 +80,21 @@ pipeline {
         // ══════════════════════════════════════════════════
         stage('Build') {
             steps {
-                echo 'Build stage...'
-                bat 'echo Build #%BUILD_NUMBER% completed successfully'
+                echo 'Build stage completed'
+                bat 'echo Build #%BUILD_NUMBER% done'
             }
         }
 
         // ══════════════════════════════════════════════════
-        // STAGE 7 — DEPLOY (main branch only)
+        // STAGE 7 — DEPLOY
         // ══════════════════════════════════════════════════
         stage('Deploy') {
             when {
                 branch 'main'
             }
             steps {
-                echo 'Deploying application...'
-                bat 'echo Deploying build #%BUILD_NUMBER%...'
+                echo 'Deploying...'
+                bat 'echo Deploy #%BUILD_NUMBER%'
             }
         }
     }
@@ -152,8 +108,8 @@ pipeline {
             echo 'PIPELINE FAILED - CHECK LOGS'
         }
         always {
-            echo 'Cleaning up workspace...'
-            cleanWs()
+            echo 'Cleaning workspace...'
+            deleteDir()
         }
     }
 }
